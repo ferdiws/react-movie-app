@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react'
-import { Text, View, ScrollView, ImageBackground, StyleSheet } from 'react-native'
+import { Text, View, ScrollView, ImageBackground, StyleSheet, TouchableOpacity } from 'react-native'
 import { API_ACCESS_TOKEN } from '@env'
 import type { Movie } from '../types/app'
 import { FontAwesome } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
 import MovieList from '../components/movies/MovieList'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 const MovieDetail = ({ route }: any): JSX.Element => {
   const { id } = route.params
   const [movie, setMovie] = useState<Movie>()
+  const [isFavorite, setIsFavorite] = useState(false)
 
   useEffect(() => {
     getMovieDetail()
@@ -42,6 +44,70 @@ const MovieDetail = ({ route }: any): JSX.Element => {
     return formattedDate
   }
 
+  const addFavorite = async (movie: Movie): Promise<void> => {
+    try {
+      const initialData: string | null = await AsyncStorage.getItem(
+        '@FavoriteList'
+      )
+      console.log(initialData)
+      let favMovieList: Movie[] = []
+  
+      if (initialData !== null) {
+        favMovieList = [...JSON.parse(initialData), movie]
+      } else {
+        favMovieList = [movie]
+      }
+  
+      await AsyncStorage.setItem('@FavoriteList', JSON.stringify(favMovieList))
+      setIsFavorite(true)
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
+  const removeFavorite = async (id: number): Promise<void> => {
+    try {
+      const initialData: string | null = await AsyncStorage.getItem(
+        '@FavoriteList'
+      )
+      console.log(initialData)
+      const parsedDataLocalStorage: Movie[] = JSON.parse(initialData as string)
+      const removedData = parsedDataLocalStorage.filter(
+        (movie) => movie.id !== id
+      )
+
+      await AsyncStorage.setItem("@FavoriteList", JSON.stringify(removedData))
+      
+      setIsFavorite(false)
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
+  const checkIsFavorite = async (id: number): Promise<void> => {
+    try {
+      const initialData: string | null = await AsyncStorage.getItem(
+        '@FavoriteList'
+      )
+      const parsedDataLocalStorage: Movie[] = JSON.parse(initialData as string)
+
+      if (initialData !== null) {
+        const foundFavorite = parsedDataLocalStorage.find((movie) => movie.id === id)
+        if (foundFavorite) {
+          setIsFavorite(true);
+        } else {
+          setIsFavorite(false);
+        }
+      }
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
+  useEffect(() => {
+    checkIsFavorite(movie?.id as number);
+  }, [movie]);
+
   return (
     <ScrollView
       style={{
@@ -61,9 +127,22 @@ const MovieDetail = ({ route }: any): JSX.Element => {
           style={styles.gradientStyle}
         >
           <Text style={styles.movieTitle}>{movie?.title}</Text>
-          <View style={styles.ratingContainer}>
-            <FontAwesome name="star" size={16} color="yellow" />
-            <Text style={styles.rating}>{movie?.vote_average.toFixed(1)}</Text>
+          <View style={styles.iconContainer}>
+            <View style={styles.ratingContainer}>
+              <FontAwesome name="star" size={16} color="yellow" />
+              <Text style={styles.rating}>{movie?.vote_average.toFixed(1)}</Text>
+            </View>
+            <View>
+              <TouchableOpacity onPress={() => {
+                if (isFavorite) {
+                  removeFavorite(movie?.id as number)
+                } else {
+                  addFavorite(movie as Movie)
+                }
+              }}>
+                <FontAwesome name={isFavorite ? "heart" : "heart-o"} size={16} color="pink" />
+              </TouchableOpacity>
+            </View>
           </View>
         </LinearGradient>
       </ImageBackground>
@@ -118,7 +197,13 @@ const styles = StyleSheet.create({
     display: 'flex',
     justifyContent: 'flex-end',
   },
+  iconContainer: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-around'
+  },
   ratingContainer: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 4,
